@@ -603,14 +603,121 @@ const FO02Form = ({ showToast }) => <FormWrapper titulo="FO-02 — Parte Diario 
   { key: 'equipos', label: 'Equipos activos', placeholder: 'Ej: Grúa 50T, Compactadora...' },
 ]} />
 
-const FO03Form = ({ showToast }) => <FormWrapper titulo="FO-03 — Planificación Semanal" tabla="fo03_planificacion" showToast={showToast} campos={[
-  { key: 'semana_num', label: 'Semana N°', type: 'number', placeholder: '12' },
-  { key: 'fecha_inicio', label: 'Fecha inicio semana', type: 'date' },
-  { key: 'tarea', label: 'Descripción de la tarea', full: true, placeholder: 'Tarea planificada' },
-  { key: 'responsable', label: 'Responsable', placeholder: 'Nombre' },
-  { key: 'fase', label: 'Fase MSIP', type: 'select', options: ['CO — Construcción', 'PL — Planeamiento', 'SE — Seguimiento', 'PC — Precomisionado', 'CM — Comisionado'] },
-  { key: 'dia', label: 'Día', type: 'select', options: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'] },
-]} />
+function FO03Form({ showToast }) {
+  const [semana_num, setSemana] = useState('')
+  const [fecha_inicio, setFecha] = useState('')
+  const [tareas, setTareas] = useState([])
+  const [tarea, setTarea] = useState({ tarea: '', responsable: '', fase: 'CO — Construcción', dia: 'Lunes' })
+  const [saving, setSaving] = useState(false)
+
+  const agregarTarea = () => {
+    if (!tarea.tarea || !tarea.responsable) { showToast('Completá Tarea y Responsable', false); return }
+    setTareas(prev => [...prev, { ...tarea, id: Date.now() }])
+    setTarea({ tarea: '', responsable: '', fase: 'CO — Construcción', dia: 'Lunes' })
+  }
+
+  const quitarTarea = (id) => setTareas(prev => prev.filter(t => t.id !== id))
+
+  const handleGuardar = async () => {
+    if (!semana_num) { showToast('Ingresá el número de semana', false); return }
+    if (tareas.length === 0) { showToast('Agregá al menos una tarea', false); return }
+    setSaving(true)
+    const rows = tareas.map(t => ({ semana_num: parseInt(semana_num), fecha_inicio: fecha_inicio || null, tarea: t.tarea, responsable: t.responsable, fase: t.fase, dia: t.dia }))
+    const { error } = await supabase.from('fo03_planificacion').insert(rows)
+    setSaving(false)
+    if (error) { showToast('Error al guardar: ' + error.message, false); return }
+    showToast(`${tareas.length} tareas guardadas en FO-03`)
+    setTareas([])
+    setSemana('')
+    setFecha('')
+  }
+
+  return (
+    <div style={s.card}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.grisDark, marginBottom: 14,
+        paddingBottom: 10, borderBottom: `1px solid ${C.grisMed}` }}>
+        FO-03 — Planificación Semanal
+      </div>
+
+      {/* Cabecera semana */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div>
+          <label style={s.label}>Semana N° *</label>
+          <input type="number" value={semana_num} onChange={e => setSemana(e.target.value)} placeholder="12" style={s.input} />
+        </div>
+        <div>
+          <label style={s.label}>Fecha inicio semana</label>
+          <input type="date" value={fecha_inicio} onChange={e => setFecha(e.target.value)} style={s.input} />
+        </div>
+      </div>
+
+      {/* Agregar tarea */}
+      <div style={{ background: C.gris, borderRadius: 10, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.grisDark, marginBottom: 10,
+          textTransform: 'uppercase', letterSpacing: .5 }}>Agregar tarea</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={s.label}>Descripción de la tarea *</label>
+            <input value={tarea.tarea} onChange={e => setTarea(p => ({ ...p, tarea: e.target.value }))}
+              placeholder="Describí la tarea planificada..." style={s.input} />
+          </div>
+          <div>
+            <label style={s.label}>Responsable *</label>
+            <input value={tarea.responsable} onChange={e => setTarea(p => ({ ...p, responsable: e.target.value }))}
+              placeholder="Nombre" style={s.input} />
+          </div>
+          <div>
+            <label style={s.label}>Día</label>
+            <select value={tarea.dia} onChange={e => setTarea(p => ({ ...p, dia: e.target.value }))} style={s.input}>
+              {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'].map(d => <option key={d}>{d}</option>)}
+            </select>
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={s.label}>Fase MSIP</label>
+            <select value={tarea.fase} onChange={e => setTarea(p => ({ ...p, fase: e.target.value }))} style={s.input}>
+              {['CO — Construcción', 'PL — Planeamiento', 'SE — Seguimiento', 'PC — Precomisionado', 'CM — Comisionado'].map(f => <option key={f}>{f}</option>)}
+            </select>
+          </div>
+        </div>
+        <button onClick={agregarTarea} style={{ ...s.btn, background: C.azulMed, marginTop: 12 }}>
+          + Agregar tarea
+        </button>
+      </div>
+
+      {/* Lista de tareas cargadas */}
+      {tareas.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.grisDark, marginBottom: 8,
+            textTransform: 'uppercase', letterSpacing: .5 }}>
+            Tareas cargadas ({tareas.length})
+          </div>
+          <div style={{ border: `1px solid ${C.grisMed}`, borderRadius: 8, overflow: 'hidden' }}>
+            {tareas.map((t, i) => (
+              <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto 32px',
+                padding: '10px 12px', gap: 10, alignItems: 'center',
+                background: i % 2 === 0 ? C.blanco : C.gris,
+                borderBottom: i < tareas.length - 1 ? `1px solid ${C.grisMed}` : 'none' }}>
+                <span style={{ fontSize: 13 }}>{t.tarea}</span>
+                <span style={{ fontSize: 11, color: C.grisDark }}>{t.responsable}</span>
+                <Tag label={t.dia} />
+                <Tag label={t.fase.split(' — ')[0]} bg={C.azulMed + '22'} color={C.azulMed} />
+                <button onClick={() => quitarTarea(t.id)} style={{
+                  background: C.rojoClar, color: C.rojo, border: 'none', borderRadius: 4,
+                  width: 24, height: 24, cursor: 'pointer', fontSize: 14, fontWeight: 700,
+                  fontFamily: "'DM Sans', sans-serif",
+                }}>×</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button style={s.btn} onClick={handleGuardar} disabled={saving}>
+        {saving ? 'Guardando...' : `Guardar planificación (${tareas.length} tarea${tareas.length !== 1 ? 's' : ''})`}
+      </button>
+    </div>
+  )
+}
 
 const FO04Form = ({ showToast }) => <FormWrapper titulo="FO-04 — Informe Semanal de Proyecto" tabla="fo04_informe" showToast={showToast} campos={[
   { key: 'semana_num', label: 'Semana N°', type: 'number', placeholder: '12' },
